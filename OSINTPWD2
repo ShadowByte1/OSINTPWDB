@@ -404,9 +404,22 @@ def domain_check():
 			else:
 				print(f'\n{R}[-] {C}Status {code} : {W}{desc}')
 
+
 def quit():
 	print(f'\n{G}[+] {C}Completed in {W}{str(time()-start)} {C}seconds.{W}')
 	exit()
+
+ continue_to_sherlock = input(f'{G}[>] {C}Do you want to continue to the next script? (1 = Yes, 2 = No): {W}')
+    if continue_to_sherlock == '1':
+        run_sherlock()
+    else:
+        quit()
+
+def run_sherlock():
+    # Assuming 'sherlock' is the script you want to run
+    username = input(f'{G}[>] {C}Enter the username for Sherlock: {W}')
+    sherlock_command = f'sherlock {username}'
+    print(f'{G}[>] {C}Running Sherlock with command: {W}{sherlock_command}')
 
 try:
 	if __name__ == "__main__":
