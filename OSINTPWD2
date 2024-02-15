@@ -16,22 +16,12 @@ def run_sherlock(query, sites=None):
         command.extend(["--site", ",".join(sites)])
 
     try:
+        print(f"Running Sherlock command: {' '.join(command)}")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
-        return e.stdout
-
-def find_emails_from_usernames(usernames, sites=None):
-    """
-    Find emails associated with the given usernames using Sherlock.
-    """
-    emails = []
-    for username in usernames:
-        result = run_sherlock(username, sites)
-        if "No accounts found" not in result:
-            emails.extend(result.split('\n')[1:-1])  # Skip the first and last empty lines
-
-    return list(set(emails))  # Remove duplicates
+        print(f"Sherlock command failed with error: {e}")
+        return None
 
 def check_pwned(email):
     """
@@ -41,10 +31,13 @@ def check_pwned(email):
     headers = {
         "hibp-api-key": os.getenv("HIBP_API_KEY")
     }
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
         return response.json()
-    return None
+    except requests.RequestException as e:
+        print(f"Have I Been Pwned API request failed with error: {e}")
+        return None
 
 def search_breach_directory(email):
     """
@@ -56,10 +49,13 @@ def search_breach_directory(email):
         "X-RapidAPI-Key": os.getenv("BREACH_DIRECTORY_API_KEY"),
         "X-RapidAPI-Host": "breachdirectory.p.rapidapi.com"
     }
-    response = requests.get(url, headers=headers, params=querystring)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+        response.raise_for_status()
         return response.json()
-    return None
+    except requests.RequestException as e:
+        print(f"Breach Directory API request failed with error: {e}")
+        return None
 
 def display_pwned_info(email, pwned):
     """
@@ -93,20 +89,23 @@ def main():
     # Run Sherlock command for username search
     sherlock_result = run_sherlock(args.query, args.sites)
 
-    # Extract usernames from Sherlock result
-    usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
+    if sherlock_result:
+        # Extract usernames from Sherlock result
+        usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
 
-    # Find emails associated with the found usernames
-    emails = find_emails_from_usernames(usernames, args.sites)
+        # Find emails associated with the found usernames
+        for username in usernames:
+            print(f"Found username: {username}")
 
-    # Check if the emails have been pwned and use the Breach Directory API
-    for email in emails:
-        pwned = check_pwned(email)
-        display_pwned_info(email, pwned)
+            # Check if the emails have been pwned and use the Breach Directory API
+            pwned = check_pwned(username)
+            display_pwned_info(username, pwned)
 
-        # Use the Breach Directory API
-        breach_data = search_breach_directory(email)
-        display_breach_directory_info(email, breach_data)
+            # Use the Breach Directory API
+            breach_data = search_breach_directory(username)
+            display_breach_directory_info(username, breach_data)
+    else:
+        print("Sherlock search failed. Check the input and try again.")
 
 if __name__ == "__main__":
     main()
