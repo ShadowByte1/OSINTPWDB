@@ -11,7 +11,7 @@ def run_sherlock(query, sites=None):
     """
     Run Sherlock command to search for the given username on social media platforms.
     """
-    command = ["python3", "sherlock.py", query]
+    command = ["sherlock", query]
     if sites:
         command.extend(["--site", ",".join(sites)])
 
