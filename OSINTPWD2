@@ -1,8 +1,8 @@
 import argparse
 import subprocess
-import requests
 from dotenv import load_dotenv
 import os
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +20,18 @@ def run_sherlock(query, sites=None):
         return result.stdout
     except subprocess.CalledProcessError as e:
         return e.stdout
+
+def find_emails_from_usernames(usernames, sites=None):
+    """
+    Find emails associated with the given usernames using Sherlock.
+    """
+    emails = []
+    for username in usernames:
+        result = run_sherlock(username, sites)
+        if "No accounts found" not in result:
+            emails.extend(result.split('\n')[1:-1])  # Skip the first and last empty lines
+
+    return list(set(emails))  # Remove duplicates
 
 def check_pwned(email):
     """
@@ -49,20 +61,20 @@ def search_breach_directory(email):
         return response.json()
     return None
 
-def display_pwned_info(email, pwned_data):
+def display_pwned_info(email, pwned):
     """
-    Display information about breaches from Have I Been Pwned.
+    Display information about pwned status for the given email.
     """
-    if pwned_data and "Breaches" in pwned_data:
+    if pwned and "Breaches" in pwned:
         print(f"Email address {email} has been pwned in the following breaches (Have I Been Pwned):")
-        for breach in pwned_data["Breaches"]:
+        for breach in pwned["Breaches"]:
             print(f"- {breach['Name']} (pwned count: {breach['PwnedCount']})")
     else:
         print(f"Email address {email} not found in Have I Been Pwned.")
 
 def display_breach_directory_info(email, breach_data):
     """
-    Display information about breaches from the Breach Directory API.
+    Display information about breaches from Breach Directory for the given email.
     """
     if breach_data and "breaches" in breach_data:
         print(f"Email address {email} found in the following breaches in Breach Directory:")
@@ -73,27 +85,28 @@ def display_breach_directory_info(email, breach_data):
 
 def main():
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Search for usernames and associated emails, then check for breaches.")
-    parser.add_argument("query", help="The username or email address to search for.")
-    parser.add_argument("-u", "--username", action="store_true", help="Search for a username instead of an email address.")
+    parser = argparse.ArgumentParser(description="Search for usernames, associated emails, and check for breaches.")
+    parser.add_argument("query", help="The username to search for.")
     parser.add_argument("-s", "--sites", nargs="+", metavar="site", help="Specify the sites to search. Use 'all' to search all sites.")
     args = parser.parse_args()
 
-    query_type = "username" if args.username else "email"
-    query = args.query.lower()
+    # Run Sherlock command for username search
+    sherlock_result = run_sherlock(args.query, args.sites)
 
-    if args.username:
-        # Run Sherlock command for username search
-        sherlock_result = run_sherlock(query, args.sites)
-        print(sherlock_result)
-    else:
-        # Check if the email has been pwned
-        pwned = check_pwned(query)
-        display_pwned_info(query, pwned)
+    # Extract usernames from Sherlock result
+    usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
+
+    # Find emails associated with the found usernames
+    emails = find_emails_from_usernames(usernames, args.sites)
+
+    # Check if the emails have been pwned and use the Breach Directory API
+    for email in emails:
+        pwned = check_pwned(email)
+        display_pwned_info(email, pwned)
 
         # Use the Breach Directory API
-        breach_data = search_breach_directory(query)
-        display_breach_directory_info(query, breach_data)
+        breach_data = search_breach_directory(email)
+        display_breach_directory_info(email, breach_data)
 
 if __name__ == "__main__":
     main()
