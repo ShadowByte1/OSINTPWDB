@@ -33,7 +33,7 @@ def highlight_json(json_string):
 
 if __name__ == "__main__":
     # Prompt the user to enter a username
-    username = input("Enter the username to test for: ")
+    username = input("Enter the Email to test for: ")
     
     # Replace "<REPLACE_WITH_ACTUAL_TERM>" with the entered username
     required_term = username
