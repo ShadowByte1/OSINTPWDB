@@ -80,33 +80,55 @@ def display_breach_directory_info(email, breach_data):
     else:
         print(f"No breaches found in Breach Directory for {email}.")
 
+def user_menu():
+    """
+    Display the main menu and return the user's choice.
+    """
+    print("\nMain Menu:")
+    print("1. Search by Username")
+    print("2. Exit")
+    return input("Enter your choice (1-2): ")
+
+def username_menu():
+    """
+    Display the username search menu and return the entered username.
+    """
+    return input("\nEnter the username to search: ")
+
 def main():
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Search for usernames, associated emails, and check for breaches.")
-    parser.add_argument("query", help="The username to search for.")
-    parser.add_argument("-s", "--sites", nargs="+", metavar="site", help="Specify the sites to search. Use 'all' to search all sites.")
-    args = parser.parse_args()
+    while True:
+        choice = user_menu()
 
-    # Run Sherlock command for username search
-    sherlock_result = run_sherlock(args.query, args.sites)
+        if choice == '1':
+            # Search by username
+            username = username_menu()
 
-    if sherlock_result:
-        # Extract usernames from Sherlock result
-        usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
+            # Run Sherlock command for username search
+            sherlock_result = run_sherlock(username)
 
-        # Find emails associated with the found usernames
-        for username in usernames:
-            print(f"\nFound username: {username}")
+            if sherlock_result:
+                # Extract usernames from Sherlock result
+                usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
 
-            # Check if the emails have been pwned and use the Breach Directory API
-            pwned = check_pwned(username)
-            display_pwned_info(username, pwned)
+                # Find emails associated with the found usernames
+                for username in usernames:
+                    print(f"\nFound username: {username}")
 
-            # Use the Breach Directory API
-            breach_data = search_breach_directory(username)
-            display_breach_directory_info(username, breach_data)
-    else:
-        print("Sherlock search failed. Check the input and try again.")
+                    # Check if the emails have been pwned and use the Breach Directory API
+                    pwned = check_pwned(username)
+                    display_pwned_info(username, pwned)
+
+                    # Use the Breach Directory API
+                    breach_data = search_breach_directory(username)
+                    display_breach_directory_info(username, breach_data)
+            else:
+                print("Sherlock search failed. Check the input and try again.")
+        elif choice == '2':
+            # Exit the script
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please enter a valid option.")
 
 if __name__ == "__main__":
     main()
