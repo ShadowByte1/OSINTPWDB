@@ -18,6 +18,7 @@ def run_sherlock(query, sites=None):
     try:
         print(f"Running Sherlock command: {' '.join(command)}")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
+        print(f"Sherlock result:\n{result.stdout}")
         return result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Sherlock command failed with error: {e}")
@@ -95,7 +96,7 @@ def main():
 
         # Find emails associated with the found usernames
         for username in usernames:
-            print(f"Found username: {username}")
+            print(f"\nFound username: {username}")
 
             # Check if the emails have been pwned and use the Breach Directory API
             pwned = check_pwned(username)
