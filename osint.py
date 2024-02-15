@@ -8,7 +8,7 @@ def run_sherlock(username):
     except Exception as e:
         print(f"Error running Sherlock: {e}")
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run Sherlock with a specified username.')
     parser.add_argument('username', metavar='username', type=str, nargs='?', help='The username to search for')
 
@@ -19,6 +19,3 @@ def main():
         args.username = input("Enter the username for osint.py: ")
 
     run_sherlock(args.username)
-
-if __name__ == "__main__":
-    main()
