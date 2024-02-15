@@ -14,6 +14,22 @@ def run_breach_directory_query(required_term):
     
     return response.json()
 
+def format_breach_info(breach_info):
+    formatted_output = ""
+    
+    for breach in breach_info['result']:
+        formatted_output += "\n[+] Breach      : {}".format(breach.get('title', 'N/A'))
+        formatted_output += "\n[+] Domain      : {}".format(breach.get('domain', 'N/A'))
+        formatted_output += "\n[+] Date        : {}".format(breach.get('breachDate', 'N/A'))
+        formatted_output += "\n[+] BreachedInfo: {}".format(breach.get('dataClasses', 'N/A'))
+        formatted_output += "\n[+] Fabricated  : {}".format(breach.get('isFabricated', 'N/A'))
+        formatted_output += "\n[+] Verified    : {}".format(breach.get('isVerified', 'N/A'))
+        formatted_output += "\n[+] Retired     : {}".format(breach.get('isRetired', 'N/A'))
+        formatted_output += "\n[+] Spam        : {}".format(breach.get('isSpamList', 'N/A'))
+        formatted_output += "\n-----\n"
+    
+    return formatted_output
+
 if __name__ == "__main__":
     # Prompt the user to enter a username
     username = input("Enter the username to test for: ")
@@ -23,4 +39,6 @@ if __name__ == "__main__":
     
     result = run_breach_directory_query(required_term)
     
-    print(result)
+    # Format and print the breach information
+    formatted_output = format_breach_info(result)
+    print(formatted_output)
