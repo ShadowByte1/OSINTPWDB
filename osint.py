@@ -11,8 +11,9 @@ def run_sherlock(username):
 if __name__ == "__main__":
     # Check if the username is provided as a command line argument
     if len(sys.argv) != 2:
-        print("Usage: python osint.py <username>")
-        sys.exit(1)
+        # Ask for a username if not provided
+        username = input("Enter the username for osint.py: ")
+    else:
+        username = sys.argv[1]
 
-    username = sys.argv[1]
     run_sherlock(username)
