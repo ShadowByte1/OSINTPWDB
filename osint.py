@@ -1,4 +1,4 @@
-import sys
+import argparse
 import subprocess
 
 def run_sherlock(username):
@@ -8,12 +8,17 @@ def run_sherlock(username):
     except Exception as e:
         print(f"Error running Sherlock: {e}")
 
-if __name__ == "__main__":
-    # Check if the username is provided as a command line argument
-    if len(sys.argv) != 2:
-        # Ask for a username if not provided
-        username = input("Enter the username for osint.py: ")
-    else:
-        username = sys.argv[1]
+def main():
+    parser = argparse.ArgumentParser(description='Run Sherlock with a specified username.')
+    parser.add_argument('username', metavar='username', type=str, nargs='?', help='The username to search for')
 
-    run_sherlock(username)
+    args = parser.parse_args()
+
+    if not args.username:
+        # Ask for a username if not provided
+        args.username = input("Enter the username for osint.py: ")
+
+    run_sherlock(args.username)
+
+if __name__ == "__main__":
+    main()
