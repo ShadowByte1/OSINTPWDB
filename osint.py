@@ -3,7 +3,10 @@
 from argparse import ArgumentParser
 import requests
 from time import time, sleep
+from os import system, remove, getenv, path, environ  # Add this import
 import re
+from json import loads, dumps
+from html2text import html2text
 
 ap = ArgumentParser()
 ap.add_argument('-e', '--email', required=False, help='Email Address You Want to Test')
