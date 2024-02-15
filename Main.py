@@ -18,3 +18,6 @@ username = input("Enter the username for osint.py: ")
 
 # Run osint.py with the provided username
 run_script("osint.py", "-u", username)
+
+# Run BreachedCredCheck.py
+run_script("BreachedCredCheck.py")
