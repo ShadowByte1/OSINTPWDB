@@ -1,108 +1,46 @@
-#!/usr/bin/env python3
-
-from argparse import ArgumentParser
-import requests
-from os import system, remove, getenv, environ, path
-from time import time, sleep
-from json import loads, dumps
-from html2text import html2text
+import argparse
+from json import loads
 from re import search
+from time import sleep
+from requests import get
+from os import path
 
-ap = ArgumentParser()
-ap.add_argument('-e', '--email', required=False, help='Email Address You Want to Test')
-ap.add_argument('-f', '--file', required=False, help='Load a File with Multiple Email Addresses')
-ap.add_argument('-fp', '--filepawned', required=False, help='Output file for pawned mail addresses')
-ap.add_argument('-d', '--domain', required=False, help='Filter Results by Domain Name')
-ap.add_argument('-b', '--breach', required=False, help='Get Info about breach')
-ap.add_argument('-n', '--nodumps', required=False, action='store_true', help='Only Check Breach Info and Skip Password Dumps')
-ap.add_argument('-l', '--list', required=False, action='store_true', help='Get List of all pwned Domains')
-ap.add_argument('-c', '--check', required=False, help='Check if your Domain is pwned')
-arg = ap.parse_args()
-addr, file, filepawned, domain, breach_name, nodumps, list_domain, check_domain = arg.email, arg.file, arg.filepawned, arg.domain, arg.breach, arg.nodumps, arg.list, arg.check
+G, C, Y, R, W = '\033[92m', '\033[96m', '\033[93m', '\033[91m', '\033[0m'
 
-R, G, C, W, Y = '\033[31m', '\033[32m', '\033[36m', '\033[0m', '\033[33m'
-
-version, key, useragent, start, idle_time = '1.3.0.2', '', '', '', 1.6
-conf_path = path.join(getenv('HOME') or getenv('USERPROFILE'), '.config', 'pwnedornot', 'config.json')
-response_codes = {200: "OK", 400: "Bad request", 401: "Unauthorised", 403: "Forbidden", 404: "Not Pwned", 429: "Too many requests", 503: "Service unavailable"}
-
-def banner():
-    banner_text = r'''
-                                  ______       _   __      __
-    ____ _      ______  ___  ____/ / __ \_____/ | / /___  / /_
-   / __ \ | /| / / __ \/ _ \/ __  / / / / ___/  |/ / __ \/ __/
-  / /_/ / |/ |/ / / / /  __/ /_/ / /_/ / /  / /|  / /_/ / /_
- / .___/|__/|__/_/ /_/\___/\__,_/\____/_/  /_/ |_/\____/\__/
-/_/
-'''
-    print(G + banner_text + W)
-    print(f'{G}[>]{C} Created by : {W}thewhiteh4t')
-    print(f'{G}[>]{C} Version    : {W}{version}\n')
-
-def read_config():
-    global key, useragent
-    with open(conf_path, 'r') as config:
-        json_cnf = loads(config.read())
-        key = json_cnf.get('api_key', '')
-        if key:
-            print(f'{G}[+] {C}API Key Found...{W}\n')
-            useragent = {'User-Agent': 'pwnedOrNot', 'hibp-api-key': key}
-        else:
-            print(f'{R}[-] {C}API Key Not Found...{W}\n')
-            print(f'{G}[+] {C}Get your API Key : {W}https://haveibeenpwned.com/API/Key \n')
-            enter_key = input(f'{G}[+]{C} Enter your API Key : {W}').strip()
-            with open(conf_path, 'w') as keyfile:
-                key_dict = {'api_key': enter_key}
-                json_data = dumps(key_dict)
-                keyfile.write(json_data)
-            print(f'{G}[+] {C}Saved API Key in : {W}{conf_path}\n')
+useragent = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+response_codes = {
+    200: 'OK',
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    429: 'Too Many Requests'
+}
 
 def main():
-    global addr, start
-    start = time()
-    banner()
-    read_config()
+    parser = argparse.ArgumentParser(description='OSINT tool to check if an email has been breached.')
+    parser.add_argument('-e', '--email', dest='email', help='Email address to check', required=True)
+    args = parser.parse_args()
+    
+    global addr
+    addr = args.email
+    global check_domain
+    check_domain = addr.split('@')[-1]
 
-    if filepawned and path.exists(filepawned):
-        remove(filepawned)
+    global nodumps
+    nodumps = False
 
-    if list_domain:
-        domains_list()
-    elif check_domain:
-        domain_check()
-    elif breach_name:
-        breach_info()
-    elif addr and not domain:
-        check()
-    elif file and not domain:
-        print(f'{G}[+] {C}Reading Emails Addresses from {W}{file}\n')
-        with open(file) as dict:
-            for line in dict:
-                addr = line.strip()
-                if addr:
-                    check()
-                    sleep(idle_time)
-    elif file and domain:
-        print(f'{G}[+] {C}Reading Emails Addresses from {W}{file}\n')
-        print(f'{G}[+] {C}Domain : {W}{domain}')
-        with open(file) as dict:
-            for line in dict:
-                addr = line.strip()
-                if addr:
-                    filtered_check()
-                    sleep(idle_time)
-    else:
-        print(f'{R}[-] {C}Error : {W}At least 1 Argument is Required, Try : {G}python3 pwnedornot.py -h{W}')
-        exit()
+    global filepawned
+    filepawned = None
 
-    if addr:
-        check_breached_directory(addr)
-    quit()
+    haveibeenpwned_check()
+    sleep(1)  # Adding a small delay before checking Breached Directory
+    breached_directory_check()
 
-def check_breached_directory(email):
-    print(f'{G}[+] {C}Checking Breached Directory status for {W}{email}', end='')
-    rqst = requests.get(
-        f'https://haveibeenpwned.com/api/v3/breachedaccount/{email}/breaches',
+def haveibeenpwned_check():
+    print(f'{G}[+] {C}Checking Have I Been Pwned: {W}{addr}')
+    rqst = get(
+        f'https://haveibeenpwned.com/api/v3/breachedaccount/{addr}',
         headers=useragent,
         params={'truncateResponse': 'false'},
         timeout=10
@@ -111,10 +49,10 @@ def check_breached_directory(email):
     for code, desc in response_codes.items():
         if sc == code:
             if sc == 200:
-                print(f' {G}[ pwned ]{W}')
+                print(f'{G}[ pwned ]{W}')
                 json_out = rqst.content.decode('utf-8', 'ignore')
                 simple_out = loads(json_out)
-                print(f'\n{G}[+] {C}Total Breaches in Breached Directory : {W}{len(simple_out)}')
+                print(f'{G}[+] {C}Total Breaches : {W}{len(simple_out)}')
                 for item in simple_out:
                     print(f'\n' \
                           f'{G}[+] {C}Breach      : {W}{item["Title"]} \n' \
@@ -126,27 +64,47 @@ def check_breached_directory(email):
                           f'{G}[+] {C}Retired     : {W}{item["IsRetired"]} \n' \
                           f'{G}[+] {C}Spam        : {W}{item["IsSpamList"]}'
                           )
-                print(f'-----\n')
+                    print(f'-----\n')
                 if not nodumps:
                     dump()
+            elif sc == 404:
+                print(f' {R}[ not pwned ]{W}')
+            elif sc == 429:
+                retry_sleep = float(rqst.headers['Retry-After'])
+                print(f' {Y}[ retry in {retry_sleep}s]{W}')
+                sleep(retry_sleep)
+                haveibeenpwned_check()
+            else:
+                print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
+
+def breached_directory_check():
+    print(f'{G}[+] {C}Checking Breached Directory status for {W}{addr}')
+    rqst = get(
+        f'https://breachdirectory.com/api/pwned?Name={addr}',
+        headers=useragent,
+        timeout=10
+    )
+    sc = rqst.status_code
+    for code, desc in response_codes.items():
+        if sc == code:
+            if sc == 200:
+                print(f'{G}[ pwned in Breached Directory ]{W}')
                 if filepawned is not None:
                     with open(filepawned, 'a') as fileout:
                         fileout.write(addr + '\n')
             elif sc == 404:
                 print(f' {R}[ not pwned in Breached Directory ]{W}')
-                if not nodumps:
-                    dump()
             elif sc == 429:
                 retry_sleep = float(rqst.headers['Retry-After'])
                 print(f' {Y}[ retry in {retry_sleep}s]{W}')
                 sleep(retry_sleep)
-                check_breached_directory(email)
+                breached_directory_check()
             else:
                 print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
 
 def dump():
     print(f'{G}[+] {C}Password Dumps : {W}')
-    rqst = requests.get(
+    rqst = get(
         f'https://haveibeenpwned.com/api/v3/breachedaccount/{addr}',
         headers=useragent,
         params={'truncateResponse': 'false'},
@@ -177,187 +135,6 @@ def dump():
                 print(f' {Y}[ retry in {retry_sleep}s]{W}')
                 sleep(retry_sleep)
                 dump()
-            else:
-                print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
-
-def filtered_check():
-    rqst = requests.get(
-        f'https://haveibeenpwned.com/api/v3/breachedaccount/{addr}',
-        headers=useragent,
-        params={'truncateResponse': 'false'},
-        timeout=10
-    )
-    sc = rqst.status_code
-    for code, desc in response_codes.items():
-        if sc == code:
-            if sc == 200:
-                print(f'{G}[+] {C}Filtering Breached Data for : {W}{addr}')
-                filtered_info = []
-                json_out = rqst.content.decode('utf-8', 'ignore')
-                simple_out = loads(json_out)
-                for item in simple_out:
-                    if search(domain.lower(), item["Domain"].lower()):
-                        filtered_info.append(item)
-                        print(f'{G}[+] {C}Breach      : {W}{item["Title"]}')
-                        print(f'{G}[+] {C}Domain      : {W}{item["Domain"]}')
-                        print(f'{G}[+] {C}Date        : {W}{item["BreachDate"]}')
-                        print(f'{G}[+] {C}BreachedInfo: {W}{item["DataClasses"]}')
-                        print(f'{G}[+] {C}Fabricated  : {W}{item["IsFabricated"]}')
-                        print(f'{G}[+] {C}Verified    : {W}{item["IsVerified"]}')
-                        print(f'{G}[+] {C}Retired     : {W}{item["IsRetired"]}')
-                        print(f'{G}[+] {C}Spam        : {W}{item["IsSpamList"]}')
-                        print(f'-----')
-                if not nodumps:
-                    dump_filtered(filtered_info)
-            elif sc == 404:
-                print(f'{R}[-] {C}Status 404 : {W}Not pwned')
-            elif sc == 429:
-                retry_sleep = float(rqst.headers['Retry-After'])
-                print(f'{Y}[ retry in {retry_sleep}s]{W}')
-                sleep(retry_sleep)
-                filtered_check()
-            else:
-                print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
-
-def dump_filtered(filtered_info):
-    print(f'{G}[+] {C}Password Dumps : {W}')
-    for item in filtered_info:
-        rqst = requests.get(
-            f'https://haveibeenpwned.com/api/v3/breach/{item["Name"]}',
-            headers=useragent,
-            params={'truncateResponse': 'false'},
-            timeout=10
-        )
-        sc = rqst.status_code
-        for code, desc in response_codes.items():
-            if sc == code:
-                if sc == 200:
-                    json_out = rqst.content.decode('utf-8', 'ignore')
-                    simple_out = loads(json_out)
-                    print(f'\n' \
-                          f'{G}[+] {C}Breach      : {W}{simple_out["Title"]} \n' \
-                          f'{G}[+] {C}Domain      : {W}{simple_out["Domain"]} \n' \
-                          f'{G}[+] {C}Date        : {W}{simple_out["BreachDate"]} \n' \
-                          f'{G}[+] {C}BreachedInfo: {W}{simple_out["DataClasses"]} \n' \
-                          f'{G}[+] {C}Fabricated  : {W}{simple_out["IsFabricated"]} \n' \
-                          f'{G}[+] {C}Verified    : {W}{simple_out["IsVerified"]} \n' \
-                          f'{G}[+] {C}Retired     : {W}{simple_out["IsRetired"]} \n' \
-                          f'{G}[+] {C}Spam        : {W}{simple_out["IsSpamList"]}'
-                          )
-                    print(f'-----\n')
-                elif sc == 404:
-                    print(f' {R}[ not pwned ]{W}')
-                elif sc == 429:
-                    retry_sleep = float(rqst.headers['Retry-After'])
-                    print(f' {Y}[ retry in {retry_sleep}s]{W}')
-                    sleep(retry_sleep)
-                    dump_filtered(filtered_info)
-                else:
-                    print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
-
-def check():
-    print(f'{G}[+] {C}Checking : {W}{addr}')
-    rqst = requests.get(
-        f'https://haveibeenpwned.com/api/v3/breachedaccount/{addr}',
-        headers=useragent,
-        params={'truncateResponse': 'false'},
-        timeout=10
-    )
-    sc = rqst.status_code
-    for code, desc in response_codes.items():
-        if sc == code:
-            if sc == 200:
-                print(f'{G}[ pwned ]{W}')
-                json_out = rqst.content.decode('utf-8', 'ignore')
-                simple_out = loads(json_out)
-                print(f'{G}[+] {C}Total Breaches : {W}{len(simple_out)}')
-                for item in simple_out:
-                    print(f'\n' \
-                          f'{G}[+] {C}Breach      : {W}{item["Title"]} \n' \
-                          f'{G}[+] {C}Domain      : {W}{item["Domain"]} \n' \
-                          f'{G}[+] {C}Date        : {W}{item["BreachDate"]} \n' \
-                          f'{G}[+] {C}BreachedInfo: {W}{item["DataClasses"]} \n' \
-                          f'{G}[+] {C}Fabricated  : {W}{item["IsFabricated"]} \n' \
-                          f'{G}[+] {C}Verified    : {W}{item["IsVerified"]} \n' \
-                          f'{G}[+] {C}Retired     : {W}{item["IsRetired"]} \n' \
-                          f'{G}[+] {C}Spam        : {W}{item["IsSpamList"]}'
-                          )
-                    print(f'-----\n')
-                if not nodumps:
-                    dump()
-                if filepawned is not None:
-                    with open(filepawned, 'a') as fileout:
-                        fileout.write(addr + '\n')
-            elif sc == 404:
-                print(f' {R}[ not pwned ]{W}')
-                if not nodumps:
-                    dump()
-            elif sc == 429:
-                retry_sleep = float(rqst.headers['Retry-After'])
-                print(f' {Y}[ retry in {retry_sleep}s]{W}')
-                sleep(retry_sleep)
-                check()
-            else:
-                print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
-
-def domains_list():
-    print(f'{G}[+] {C}Getting List of all pwned Domains : {W}')
-    rqst = requests.get(
-        f'https://haveibeenpwned.com/api/v3/breaches',
-        headers=useragent,
-        params={'truncateResponse': 'false'},
-        timeout=10
-    )
-    sc = rqst.status_code
-    for code, desc in response_codes.items():
-        if sc == code:
-            if sc == 200:
-                json_out = rqst.content.decode('utf-8', 'ignore')
-                simple_out = loads(json_out)
-                print(f'{G}[+] {C}Total Pwned Domains : {W}{len(simple_out)}')
-                for item in simple_out:
-                    print(f'{G}[+] {C}Pwned Domain : {W}{item["Domain"]}')
-                print(f'-----\n')
-            elif sc == 429:
-                retry_sleep = float(rqst.headers['Retry-After'])
-                print(f' {Y}[ retry in {retry_sleep}s]{W}')
-                sleep(retry_sleep)
-                domains_list()
-            else:
-                print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
-
-def domain_check():
-    print(f'{G}[+] {C}Checking Domain : {W}{check_domain}')
-    rqst = requests.get(
-        f'https://haveibeenpwned.com/api/v3/breach/{check_domain}',
-        headers=useragent,
-        params={'truncateResponse': 'false'},
-        timeout=10
-    )
-    sc = rqst.status_code
-    for code, desc in response_codes.items():
-        if sc == code:
-            if sc == 200:
-                json_out = rqst.content.decode('utf-8', 'ignore')
-                simple_out = loads(json_out)
-                print(f'\n' \
-                      f'{G}[+] {C}Breach      : {W}{simple_out["Title"]} \n' \
-                      f'{G}[+] {C}Domain      : {W}{simple_out["Domain"]} \n' \
-                      f'{G}[+] {C}Date        : {W}{simple_out["BreachDate"]} \n' \
-                      f'{G}[+] {C}BreachedInfo: {W}{simple_out["DataClasses"]} \n' \
-                      f'{G}[+] {C}Fabricated  : {W}{simple_out["IsFabricated"]} \n' \
-                      f'{G}[+] {C}Verified    : {W}{simple_out["IsVerified"]} \n' \
-                      f'{G}[+] {C}Retired     : {W}{simple_out["IsRetired"]} \n' \
-                      f'{G}[+] {C}Spam        : {W}{simple_out["IsSpamList"]}'
-                      )
-                print(f'-----\n')
-            elif sc == 404:
-                print(f' {R}[ not pwned ]{W}')
-            elif sc == 429:
-                retry_sleep = float(rqst.headers['Retry-After'])
-                print(f' {Y}[ retry in {retry_sleep}s]{W}')
-                sleep(retry_sleep)
-                domain_check()
             else:
                 print(f'\n\n{R}[-] {C}Status {code} : {W}{desc}')
 
