@@ -7,14 +7,13 @@ import sys
 # Load environment variables
 load_dotenv()
 
-def search_sherlock(query, sites=None):
+def search_sherlock(username):
     """
-    Search for the given query on social media platforms using Sherlock.
+    Search for emails associated with the given username using Sherlock.
     """
     sherlock_tool = sherlock.Sherlock()
-    if sites:
-        sherlock_tool.site_list = sites
-    return sherlock_tool.search(query)
+    results = sherlock_tool.find_username(username)
+    return results
 
 def check_pwned(email):
     """
@@ -44,49 +43,52 @@ def search_breach_directory(email):
         return response.json()
     return None
 
-def main():
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Search for a username or email address on social media platforms and check if the email has been pwned.")
-    parser.add_argument("query", help="The username or email address to search for.")
-    parser.add_argument("-u", action="store_true", help="Search for a username instead of an email address.")
-    parser.add_argument("-s", nargs="+", metavar=("site",), help="Specify the sites to search. Use 'all' to search all sites.")
-    args = parser.parse_args()
-
-    if args.u:
-        query_type = "username"
-        query = args.query
-    else:
-        query_type = "email"
-        query = args.query.lower()
-
-    # Check if the email has been pwned
-    pwned = check_pwned(query)
-    if pwned and "Breaches" in pwned:
-        print(f"Email address {query} has been pwned in the following breaches (Have I Been Pwned):")
-        for breach in pwned["Breaches"]:
+def display_pwned_info(email, pwned_data):
+    """
+    Display information about breaches from Have I Been Pwned.
+    """
+    if pwned_data and "Breaches" in pwned_data:
+        print(f"Email address {email} has been pwned in the following breaches (Have I Been Pwned):")
+        for breach in pwned_data["Breaches"]:
             print(f"- {breach['Name']} (pwned count: {breach['PwnedCount']})")
     else:
-        print(f"Email address {query} not found in Have I Been Pwned.")
+        print(f"Email address {email} not found in Have I Been Pwned.")
 
-    # Use the Breach Directory API
-    breach_data = search_breach_directory(query)
+def display_breach_directory_info(email, breach_data):
+    """
+    Display information about breaches from the Breach Directory API.
+    """
     if breach_data and "breaches" in breach_data:
-        print(f"Email address {query} found in the following breaches in Breach Directory:")
+        print(f"Email address {email} found in the following breaches in Breach Directory:")
         for breach in breach_data["breaches"]:
             print(f"- {breach['Title']}")
     else:
-        print(f"No breaches found in Breach Directory.")
+        print(f"No breaches found in Breach Directory for {email}.")
 
-    # Search for the query on the specified sites using Sherlock
-    sites = args.s if args.s else None
-    results = search_sherlock(query, sites)
+def main():
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Search for usernames and associated emails, then check for breaches.")
+    parser.add_argument("username", help="The username to search for.")
+    args = parser.parse_args()
 
-    if results:
-        print(f"\nResults for {query_type} {query} on social media platforms:")
-        for site, status in results.items():
-            print(f"- {site}: {'Found' if status else 'Not Found'}")
-    else:
-        print(f"No results found for {query_type} {query} on social media platforms.")
+    username = args.username
+
+    # Search for emails associated with the username using Sherlock
+    emails = search_sherlock(username)
+
+    if not emails:
+        print(f"No emails found associated with the username {username}.")
+        return
+
+    # Iterate through each email and check for breaches
+    for email in emails:
+        # Check if the email has been pwned
+        pwned = check_pwned(email)
+        display_pwned_info(email, pwned)
+
+        # Use the Breach Directory API
+        breach_data = search_breach_directory(email)
+        display_breach_directory_info(email, breach_data)
 
 if __name__ == "__main__":
     main()
