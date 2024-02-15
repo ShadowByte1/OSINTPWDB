@@ -1,4 +1,9 @@
 import requests
+import json
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init(autoreset=True)
 
 def run_breach_directory_query(required_term):
     url = "https://breachdirectory.p.rapidapi.com/"
@@ -14,21 +19,17 @@ def run_breach_directory_query(required_term):
     
     return response.json()
 
-def format_breach_info(breach_info):
-    formatted_output = ""
-    
-    for breach in breach_info['result']:
-        formatted_output += "\n[+] Breach      : {}".format(breach.get('title', 'N/A'))
-        formatted_output += "\n[+] Domain      : {}".format(breach.get('domain', 'N/A'))
-        formatted_output += "\n[+] Date        : {}".format(breach.get('breachDate', 'N/A'))
-        formatted_output += "\n[+] BreachedInfo: {}".format(breach.get('dataClasses', 'N/A'))
-        formatted_output += "\n[+] Fabricated  : {}".format(breach.get('isFabricated', 'N/A'))
-        formatted_output += "\n[+] Verified    : {}".format(breach.get('isVerified', 'N/A'))
-        formatted_output += "\n[+] Retired     : {}".format(breach.get('isRetired', 'N/A'))
-        formatted_output += "\n[+] Spam        : {}".format(breach.get('isSpamList', 'N/A'))
-        formatted_output += "\n-----\n"
-    
-    return formatted_output
+def pretty_print(json_data):
+    formatted_json = json.dumps(json_data, indent=4)
+    colored_json = highlight_json(formatted_json)
+    print(colored_json)
+
+def highlight_json(json_string):
+    # Highlight keywords in JSON output
+    keywords = ["true", "false", "null"]
+    for keyword in keywords:
+        json_string = json_string.replace(keyword, f"{Fore.CYAN}{keyword}{Style.RESET_ALL}")
+    return json_string
 
 if __name__ == "__main__":
     # Prompt the user to enter a username
@@ -39,6 +40,5 @@ if __name__ == "__main__":
     
     result = run_breach_directory_query(required_term)
     
-    # Format and print the breach information
-    formatted_output = format_breach_info(result)
-    print(formatted_output)
+    # Print the formatted and colored JSON
+    pretty_print(result)
