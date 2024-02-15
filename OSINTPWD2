@@ -16,12 +16,11 @@ def run_sherlock(query, sites=None):
         command.extend(["--site", ",".join(sites)])
 
     try:
-        print(f"\nRunning Sherlock command: \033[93m{' '.join(command)}\033[0m")
+        print(f"\033[94mRunning Sherlock command: {' '.join(command)}\033[0m")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-        print(f"Sherlock result:\n{result.stdout}")
         return result.stdout
     except subprocess.CalledProcessError as e:
-        print(f"Sherlock command failed with error: {e}")
+        print(f"\033[91mSherlock command failed with error: {e}\033[0m")
         return None
 
 def check_pwned(email):
@@ -37,7 +36,9 @@ def check_pwned(email):
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        print(f"Have I Been Pwned API request failed with error: {e}")
+        print(f"\033[91mHave I Been Pwned API request failed with error: {e}\033[0m")
+        print(f"Response content: {response.content}")
+        print(f"Response status code: {response.status_code}")
         return None
 
 def search_breach_directory(email):
@@ -55,7 +56,9 @@ def search_breach_directory(email):
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        print(f"Breach Directory API request failed with error: {e}")
+        print(f"\033[91mBreach Directory API request failed with error: {e}\033[0m")
+        print(f"Response content: {response.content}")
+        print(f"Response status code: {response.status_code}")
         return None
 
 def display_pwned_info(email, pwned):
@@ -63,57 +66,61 @@ def display_pwned_info(email, pwned):
     Display information about pwned status for the given email.
     """
     if pwned and "Breaches" in pwned:
-        print(f"\nEmail address {email} has been \033[91mpwned\033[0m in the following breaches (Have I Been Pwned):")
+        print(f"\033[93mEmail address {email} has been pwned in the following breaches (Have I Been Pwned):\033[0m")
         for breach in pwned["Breaches"]:
             print(f"- {breach['Name']} (pwned count: {breach['PwnedCount']})")
     else:
-        print(f"\nEmail address {email} not found in Have I Been Pwned.")
+        print(f"\033[92mEmail address {email} not found in Have I Been Pwned.\033[0m")
 
 def display_breach_directory_info(email, breach_data):
     """
     Display information about breaches from Breach Directory for the given email.
     """
     if breach_data and "breaches" in breach_data:
-        print(f"\nEmail address {email} found in the following breaches in Breach Directory:")
+        print(f"\033[93mEmail address {email} found in the following breaches in Breach Directory:\033[0m")
         for breach in breach_data["breaches"]:
             print(f"- {breach['Title']}")
     else:
-        print(f"\nNo breaches found in Breach Directory for {email}.")
+        print(f"\033[92mNo breaches found in Breach Directory for {email}.\033[0m")
 
-def user_menu():
+def main_menu():
     """
-    Display the main menu and return the user's choice.
+    Display the main menu and get user choice.
     """
-    print("\n\033[94mMain Menu:\033[0m")
+    print("\nMain Menu:")
     print("1. Search for Username")
     print("2. Check Breaches in Email")
     print("3. Exit")
     return input("Enter your choice (1-3): ")
 
-def username_menu():
-    """
-    Display the username search menu and return the entered username.
-    """
-    return input("\nEnter the username to search: ")
-
-def email_menu():
-    """
-    Display the email breach check menu and return the entered email.
-    """
-    return input("\nEnter the email to check for breaches: ")
-
 def main():
     while True:
-        choice = user_menu()
+        choice = main_menu()
 
-        if choice == '1':
-            # Search for username
-            username = username_menu()
-            run_sherlock(username)
-        elif choice == '2':
-            # Check breaches in email
-            email = email_menu()
+        if choice == "1":
+            username = input("\nEnter the username to search: ")
+            sherlock_result = run_sherlock(username)
 
+            if sherlock_result:
+                # Extract usernames from Sherlock result
+                usernames = [line.split(":")[0].strip() for line in sherlock_result.split('\n')[1:-1]]
+
+                # Find emails associated with the found usernames
+                for found_username in usernames:
+                    print(f"\n\033[94mFound username: {found_username}\033[0m")
+
+                    # Check if the emails have been pwned and use the Breach Directory API
+                    pwned = check_pwned(found_username)
+                    display_pwned_info(found_username, pwned)
+
+                    # Use the Breach Directory API
+                    breach_data = search_breach_directory(found_username)
+                    display_breach_directory_info(found_username, breach_data)
+            else:
+                print("\033[91mSherlock search failed. Check the input and try again.\033[0m")
+
+        elif choice == "2":
+            email = input("\nEnter the email to check for breaches: ")
             # Check if the email has been pwned and use the Breach Directory API
             pwned = check_pwned(email)
             display_pwned_info(email, pwned)
@@ -121,12 +128,13 @@ def main():
             # Use the Breach Directory API
             breach_data = search_breach_directory(email)
             display_breach_directory_info(email, breach_data)
-        elif choice == '3':
-            # Exit the script
-            print("Exiting...")
+
+        elif choice == "3":
+            print("Exiting. Goodbye!")
             break
+
         else:
-            print("Invalid choice. Please enter a valid option.")
+            print("\033[91mInvalid choice. Please enter a number between 1 and 3.\033[0m")
 
 if __name__ == "__main__":
     main()
