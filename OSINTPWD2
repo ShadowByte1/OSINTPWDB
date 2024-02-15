@@ -2,16 +2,16 @@ import argparse
 import subprocess
 import requests
 from dotenv import load_dotenv
-import sys
+import os
 
 # Load environment variables
 load_dotenv()
 
-def run_sherlock(username, sites=None):
+def run_sherlock(query, sites=None):
     """
     Run Sherlock command to search for the given username on social media platforms.
     """
-    command = ["python3", "sherlock.py", username]
+    command = ["python3", "sherlock.py", query]
     if sites:
         command.extend(["--site", ",".join(sites)])
 
@@ -27,7 +27,7 @@ def check_pwned(email):
     """
     url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{email}"
     headers = {
-        "hibp-api-key": sys.getenv("HIBP_API_KEY")
+        "hibp-api-key": os.getenv("HIBP_API_KEY")
     }
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
@@ -41,7 +41,7 @@ def search_breach_directory(email):
     url = "https://breachdirectory.p.rapidapi.com/"
     querystring = {"func": "auto", "term": email}
     headers = {
-        "X-RapidAPI-Key": sys.getenv("BREACH_DIRECTORY_API_KEY"),
+        "X-RapidAPI-Key": os.getenv("BREACH_DIRECTORY_API_KEY"),
         "X-RapidAPI-Host": "breachdirectory.p.rapidapi.com"
     }
     response = requests.get(url, headers=headers, params=querystring)
