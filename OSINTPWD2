@@ -11,10 +11,8 @@ def search_sherlock(query, sites=None):
     """
     Search for the given query on social media platforms using Sherlock.
     """
-    sherlock_tool = sherlock.Sherlock()
-    if sites:
-        sherlock_tool.site_list = sites
-    return sherlock_tool.search(query)
+    results = sherlock.check(query, sites=sites)
+    return results
 
 def check_pwned(email):
     """
