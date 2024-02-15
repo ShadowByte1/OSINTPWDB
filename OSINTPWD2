@@ -1,21 +1,25 @@
 import argparse
+import subprocess
 import requests
-import sherlock
 from dotenv import load_dotenv
 import sys
 
 # Load environment variables
 load_dotenv()
 
-def search_sherlock(query, sites=None):
+def run_sherlock(username, sites=None):
     """
-    Search for the given query on social media platforms using Sherlock.
+    Run Sherlock command to search for the given username on social media platforms.
     """
-    s = sherlock.Sherlock()
+    command = ["python3", "sherlock.py", username]
     if sites:
-        s.site_list = sites
-    results = s.find(query)
-    return results
+        command.extend(["--site", ",".join(sites)])
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return e.stdout
 
 def check_pwned(email):
     """
@@ -78,8 +82,11 @@ def main():
     query_type = "username" if args.username else "email"
     query = args.query.lower()
 
-    # Check if the query is an email
-    if "@" in query and not args.username:
+    if args.username:
+        # Run Sherlock command for username search
+        sherlock_result = run_sherlock(query, args.sites)
+        print(sherlock_result)
+    else:
         # Check if the email has been pwned
         pwned = check_pwned(query)
         display_pwned_info(query, pwned)
@@ -87,11 +94,6 @@ def main():
         # Use the Breach Directory API
         breach_data = search_breach_directory(query)
         display_breach_directory_info(query, breach_data)
-
-    # Search for the query on the specified sites using Sherlock
-    sites = args.sites if args.sites else None
-    results = search_sherlock(query, sites)
-    display_sherlock_results(query_type, query, results)
 
 if __name__ == "__main__":
     main()
